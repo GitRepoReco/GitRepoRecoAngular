@@ -1,0 +1,9 @@
+{
+  "/api": {
+    "target": "https://api.reporeco.duckdns.org",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/api": "" },
+    "logLevel": "debug"
+  }
+}

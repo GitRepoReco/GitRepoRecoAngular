@@ -1,0 +1,64 @@
+<header>
+  <a class="brand" href="/">
+    <img class="brand-icon" src="logo.png" alt="">
+    <span class="brand-name">Repo<b>Reco</b></span>
+  </a>
+  <button class="toggle" (click)="toggleTheme()" [attr.aria-label]="'Basculer le thème'">{{ theme() === 'dark' ? 'Day' : 'Night' }}</button>
+</header>
+
+<main>
+  @if (trendError()) {
+    <p class="api-error">Impossible de charger les repos tendance depuis l'API (voir la console).</p>
+  }
+  @if (teamError()) {
+    <p class="api-error">Impossible de charger les repos de la devteam depuis GitHub (limite de requêtes atteinte ? voir la console).</p>
+  }
+  @for (row of rows(); track row.title) {
+    @if (row.repos.length) {
+      <repo-row [title]="row.title" [subtitle]="row.subtitle" [repos]="row.repos" (select)="selected.set($event)" />
+    }
+  }
+  <twin-search (select)="selected.set($event)" />
+  <repo-quiz (select)="selected.set($event)" />
+</main>
+
+<footer class="footer">
+  <div class="footer-brand">
+    <img src="logo.png" alt="">
+    <span>RepoReco</span>
+  </div>
+
+  <nav aria-label="Project links">
+    <a href="https://github.com/GitRepoReco" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/GitRepoReco/Analyse-github" target="_blank" rel="noopener">Main project</a>
+    <a href="https://github.com/GitRepoReco/GitRepoRecoAngular" target="_blank" rel="noopener">Website code</a>
+  </nav>
+
+  <small>
+    M2 AI project, Big Data &amp; MLOps · Le Mans University · 2026<br>
+    © 2026 RepoReco-Team. Data from the public GitHub API, not affiliated with GitHub.
+  </small>
+</footer>
+
+@if (selected(); as r) {
+  <div class="backdrop" (click)="selected.set(null)">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="hero" [style.background]="'linear-gradient(135deg,' + (r.language_color ?? '#667') + ',#0b0d12)'">
+        <button class="close" (click)="selected.set(null)" aria-label="Fermer">✕</button>
+        @if (r.owner_avatar_url) { <img class="hero-avatar" [src]="r.owner_avatar_url" [alt]="r.owner_login" referrerpolicy="no-referrer"> }
+        <h2>{{ r.full_name }}</h2>
+      </div>
+      <div class="content">
+        <p>{{ r.description }}</p>
+        <div class="stats">
+          <span>⭐ {{ r.stars }}</span><span>🍴 {{ r.forks }}</span><span>👀 {{ r.total_watchers }}</span>
+          <span>🐛 {{ r.total_issues_open }} issues</span><span>🔀 {{ r.total_prs_open }} PR</span><span>📦 {{ r.total_releases }} releases</span>
+        </div>
+        <div class="tags">@for (t of r.topics; track t) { <span>#{{ t }}</span> }</div>
+        <div class="langs">@for (l of langs(r); track l[0]) { <small>{{ l[0] }}@if (l[1] !== null) { {{ l[1] }}% }</small> }</div>
+        <small class="muted">{{ r.license_name }} · last commit : {{ r.last_commit_date?.slice(0, 10) }}</small>
+        <a [href]="r.url" target="_blank" rel="noopener">See on GitHub →</a>
+      </div>
+    </div>
+  </div>
+}
