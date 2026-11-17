@@ -1,4 +1,4 @@
-name: reporeco-web
+name: GitRepoRecoAngular
 
 services:
   web:
@@ -8,7 +8,7 @@ services:
     init: true                      # gère correctement les signaux (arrêt propre) et les zombies
     restart: unless-stopped
     ports:
-      - "32001:4200"                 # <port hôte>:<port conteneur>
+      - "4200:4200"                 # <port hôte>:<port conteneur>
     environment:
       PORT: "4200"
     volumes:
@@ -20,6 +20,7 @@ services:
           cpus: "1.0"
           memory: 2G
     healthcheck:
+      # npm install au 1er démarrage peut prendre un moment : start_period généreux
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4200/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s

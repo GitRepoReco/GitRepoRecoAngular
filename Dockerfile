@@ -24,5 +24,3 @@ EXPOSE 4200
 
 # Au démarrage : npm install, puis npm start (voir docker-entrypoint.sh)
 ENTRYPOINT ["docker-entrypoint.sh"]
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:4200/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"

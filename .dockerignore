@@ -1,0 +1,25 @@
+# Dépendances et caches : réinstallés / régénérés dans le conteneur
+node_modules
+.angular
+dist
+out-tsc
+coverage
+
+# Git, IDE, macOS
+.git
+.gitignore
+.idea
+.vscode
+.DS_Store
+__MACOSX
+**/._*
+
+# Secrets et logs
+.env
+.env.*
+*.log
+
+# Fichiers Docker eux-mêmes (le script d'entrée reste nécessaire au build)
+Dockerfile
+docker-compose.yml
+.dockerignore
