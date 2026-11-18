@@ -13,3 +13,10 @@ export interface Repository {
 export interface QuizOption { label: string; tag: string }
 export interface QuizQuestion { question: string; options: QuizOption[] }
 export interface QuizResult { title: string; blurb: string; repos: Repository[] }
+
+// --- Pages Dashboard / Monitoring ---
+export type CheckState = 'checking' | 'up' | 'down';
+// Résultat d'un appel GET /health
+export interface HealthCheck { state: CheckState; latencyMs: number | null; checkedAt: Date | null; detail: string | null }
+// Résultat d'un appel GET /version
+export interface VersionInfo { state: 'checking' | 'ok' | 'error'; value: string | null }

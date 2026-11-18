@@ -1,5 +1,7 @@
-import { Component, effect, inject, signal } from '@angular/core';
-import { forkJoin, catchError, of } from 'rxjs';
+import { Component, computed, effect, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { forkJoin, catchError, of, filter, map } from 'rxjs';
 import { Repository } from './models';
 import { RepoService } from './repo.service';
 import { RepoRow } from './repo-row';
@@ -8,9 +10,15 @@ import { Quiz } from './quiz';
 
 interface Row { title: string; subtitle: string; repos: Repository[] }
 
-@Component({ selector: 'app-root', imports: [RepoRow, TwinSearch, Quiz], templateUrl: './app.html', styleUrl: './app.scss' })
+@Component({ selector: 'app-root', imports: [RepoRow, TwinSearch, Quiz, RouterLink, RouterLinkActive, RouterOutlet], templateUrl: './app.html', styleUrl: './app.scss' })
 export class App {
   private api = inject(RepoService);
+  private router = inject(Router);
+  // URL courante (null tant que la navigation initiale n'est pas terminée) : la page principale n'est affichée que sur "/".
+  private url = toSignal(
+    this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd), map((e): string | null => e.urlAfterRedirects)),
+    { initialValue: null });
+  onHome = computed(() => { const u = this.url(); return u !== null && u.split(/[?#]/)[0] === '/'; });
   theme = signal<'dark' | 'light'>(
     (localStorage.getItem('theme') as 'dark' | 'light') ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
   rows = signal<Row[]>([]);

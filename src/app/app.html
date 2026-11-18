@@ -3,23 +3,32 @@
     <img class="brand-icon" src="logo.png" alt="">
     <span class="brand-name">Repo<b>Reco</b></span>
   </a>
+  <nav class="tabs" aria-label="Sections">
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Home</a>
+    <a routerLink="/monitoring" routerLinkActive="active">Monitoring</a>
+    <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+  </nav>
   <button class="toggle" (click)="toggleTheme()" [attr.aria-label]="'Basculer le thème'">{{ theme() === 'dark' ? 'Day' : 'Night' }}</button>
 </header>
 
 <main>
-  @if (trendError()) {
-    <p class="api-error">Impossible de charger les repos tendance depuis l'API (voir la console).</p>
-  }
-  @if (teamError()) {
-    <p class="api-error">Impossible de charger les repos de la devteam depuis GitHub (limite de requêtes atteinte ? voir la console).</p>
-  }
-  @for (row of rows(); track row.title) {
-    @if (row.repos.length) {
-      <repo-row [title]="row.title" [subtitle]="row.subtitle" [repos]="row.repos" (select)="selected.set($event)" />
+  <!-- Page principale (inchangée) : masquée, et non détruite, sur les autres onglets pour conserver l'état du quiz / de la recherche -->
+  <div [hidden]="!onHome()">
+    @if (trendError()) {
+      <p class="api-error">Impossible de charger les repos tendance depuis l'API (voir la console).</p>
     }
-  }
-  <twin-search (select)="selected.set($event)" />
-  <repo-quiz (select)="selected.set($event)" />
+    @if (teamError()) {
+      <p class="api-error">Impossible de charger les repos de la devteam depuis GitHub (limite de requêtes atteinte ? voir la console).</p>
+    }
+    @for (row of rows(); track row.title) {
+      @if (row.repos.length) {
+        <repo-row [title]="row.title" [subtitle]="row.subtitle" [repos]="row.repos" (select)="selected.set($event)" />
+      }
+    }
+    <twin-search (select)="selected.set($event)" />
+    <repo-quiz (select)="selected.set($event)" />
+  </div>
+  <router-outlet />
 </main>
 
 <footer class="footer">

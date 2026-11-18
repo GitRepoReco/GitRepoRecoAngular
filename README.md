@@ -18,6 +18,8 @@ The application is inspired by Netflix's interface: scrollable rows of recommend
 - **Repository details**: description, statistics, topics, language breakdown, license, last commit and a link to GitHub.
 - **Twin repositories**: free-text search (README, title, topics...) to find equivalent repositories, with a similarity score and a badge for abandoned projects.
 - **Buzzfeed-style quiz**: a few questions, a developer profile, then recommended repositories.
+- **Monitoring** tab (skeleton): deployed ML models, versions, environments, data drift and retraining actions. Not connected yet.
+- **Dashboard** tab: DevOps view. The *GitRepoReco API* card is live (healthcheck, version, response time, refreshed every 30 s); pipeline and components are skeletons.
 
 ---
 
@@ -74,6 +76,10 @@ src/
     ├── repo.service.ts          — data access layer
     ├── repo-card.ts             — repository card
     ├── repo-row.ts              — horizontally scrollable row
+    ├── app.routes.ts            — routes (/, /monitoring, /dashboard)
+    ├── dashboard.ts             — Dashboard tab (DevOps)
+    ├── monitoring.ts            — Monitoring tab (MLOps)
+    ├── status.service.ts        — API healthcheck / version
     ├── twin-search.ts           — twin repositories search
     └── quiz.ts                  — recommendation quiz
 ```
