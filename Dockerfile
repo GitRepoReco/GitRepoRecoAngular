@@ -3,6 +3,10 @@
 # Node 22 : compatible avec Angular CLI 20 (>= 22.12 requis)
 FROM node:22-bookworm-slim
 
+ARG APP_VERSION=dev
+
+ENV APP_VERSION=${APP_VERSION}
+
 # NODE_ENV=development est indispensable : @angular/cli et @angular/build sont des devDependencies,
 # elles ne seraient pas installées avec NODE_ENV=production.
 # max-old-space-size garde le heap de Node (~1,5 Go) sous la limite de 2 Go du conteneur.
