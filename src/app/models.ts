@@ -20,3 +20,13 @@ export type CheckState = 'checking' | 'up' | 'down';
 export interface HealthCheck { state: CheckState; latencyMs: number | null; checkedAt: Date | null; detail: string | null }
 // Résultat d'un appel GET /version
 export interface VersionInfo { state: 'checking' | 'ok' | 'error'; value: string | null }
+
+// Pipeline CI/CD : runs GitHub Actions (GET /repos/{repo}/actions/runs) et jobs du dernier run
+export interface PipelineRun {
+  id: number; name: string; title: string; status: string; conclusion: string | null;
+  event: string; branch: string; sha: string; url: string; actor: string | null;
+  startedAt: string; durationSec: number | null;
+}
+export interface PipelineJob { name: string; status: string; conclusion: string | null; durationSec: number | null; url: string }
+export interface PipelineData { runs: PipelineRun[]; jobs: PipelineJob[]; fetchedAt: number }
+export interface PipelineState { state: 'checking' | 'ok' | 'error'; data: PipelineData | null; stale: boolean; message: string | null }

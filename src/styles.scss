@@ -16,6 +16,8 @@ h2{margin:0 0 .25rem}
 .ops-sub{margin:.25rem 0 0;color:var(--muted);font-size:.9rem}
 .ops-actions{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;small{color:var(--muted)}}
 .ops-section h2{font-size:1.2rem;margin-bottom:.8rem}
+.ops-sub-title{margin:1.4rem 0 .7rem;font-size:.95rem;font-weight:600;color:var(--muted)}
+.ops-card a,.ops-table a{color:var(--accent)}
 .ops-btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:.55rem 1.1rem;font-weight:600;
   &:disabled{opacity:.5;cursor:not-allowed}
   &.ghost{background:none;color:var(--text);border:1px solid var(--border)}}
