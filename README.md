@@ -19,7 +19,7 @@ The application is inspired by Netflix's interface: scrollable rows of recommend
 - **Twin repositories**: free-text search (README, title, topics...) to find equivalent repositories, with a similarity score and a badge for abandoned projects.
 - **Buzzfeed-style quiz**: a few questions, a developer profile, then recommended repositories.
 - **Monitoring** tab (skeleton): deployed ML models, versions, environments, data drift and retraining actions. Not connected yet.
-- **Dashboard** tab: DevOps view. The *GitRepoReco API* card is live (healthcheck, version, response time, refreshed every 30 s). The *Pipeline* section shows the GitHub Actions runs of the repo (`PIPELINE_REPO` in `api.config.ts`, no token needed, cached 5 min in `localStorage` because of the 60 requests/hour limit). *Components*: Frontend and API status; Database waits for the upcoming API status endpoint.
+- **Dashboard** tab: DevOps view. The *GitRepoReco API* card is live (healthcheck, version, response time, refreshed every 30 s). The *Pipeline* section shows the GitHub Actions runs of the repo (`PIPELINE_REPO` in `api.config.ts`, no token needed, cached 5 min in `localStorage` because of the 60 requests/hour limit). *Components*: Frontend and API status, plus the PostgreSQL database (uptime, connections, size, cache hit ratio, active queries, schemas) read from the API's `/monitoring/*` endpoints.
 
 ---
 

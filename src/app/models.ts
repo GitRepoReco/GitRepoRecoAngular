@@ -17,7 +17,7 @@ export interface QuizResult { title: string; blurb: string; repos: Repository[] 
 // --- Pages Dashboard / Monitoring ---
 export type CheckState = 'checking' | 'up' | 'down';
 // Résultat d'un appel GET /health
-export interface HealthCheck { state: CheckState; latencyMs: number | null; checkedAt: Date | null; detail: string | null }
+export interface HealthCheck { state: CheckState; latencyMs: number | null; checkedAt: Date | null; detail: string | null; uptime: string | null }
 // Résultat d'un appel GET /version
 export interface VersionInfo { state: 'checking' | 'ok' | 'error'; value: string | null }
 
@@ -30,3 +30,15 @@ export interface PipelineRun {
 export interface PipelineJob { name: string; status: string; conclusion: string | null; durationSec: number | null; url: string }
 export interface PipelineData { runs: PipelineRun[]; jobs: PipelineJob[]; fetchedAt: number }
 export interface PipelineState { state: 'checking' | 'ok' | 'error'; data: PipelineData | null; stale: boolean; message: string | null }
+
+// Base de données : endpoints /monitoring/* de l'API (instance PostgreSQL)
+export interface DbGeneral { version: string; start_time: string; uptime: string; max_connections: number; active_connections: number; total_connections: number }
+export interface DbSize { database: string; size_bytes: number; size: string }
+export interface DbSchema { schemaname: string; table_count: number }
+export interface DbCache { cache_hits: number; disk_reads: number; cache_hit_ratio: number }
+export interface DatabaseStatus {
+  state: CheckState; checkedAt: Date | null; latencyMs: number | null;
+  general: DbGeneral | null; databases: DbSize[] | null; schemas: DbSchema[] | null; cache: DbCache | null;
+  activeQueries: number | null;
+  failed: string[]; // endpoints /monitoring/* qui n'ont pas répondu
+}

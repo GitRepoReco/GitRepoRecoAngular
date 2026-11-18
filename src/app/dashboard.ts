@@ -1,7 +1,7 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { API_BASE_URL, PIPELINE_REPO } from './api.config';
-import { HealthCheck, PipelineJob, PipelineRun, PipelineState, VersionInfo } from './models';
+import { DatabaseStatus, HealthCheck, PipelineJob, PipelineRun, PipelineState, VersionInfo } from './models';
 import { StatusService } from './status.service';
 
 const REFRESH_MS = 30_000;
@@ -48,10 +48,10 @@ const REFRESH_MS = 30_000;
               <div class="value">{{ health().latencyMs !== null ? health().latencyMs + ' ms' : '—' }}</div>
               <div class="hint">Round trip of the last healthcheck</div>
             </div>
-            <div class="ops-tile idle">
+            <div class="ops-tile" [class.idle]="!health().uptime">
               <div class="label">Uptime</div>
-              <div class="value">—</div>
-              <div class="hint">Not exposed by the API yet</div>
+              <div class="value">{{ health().uptime ?? '—' }}</div>
+              <div class="hint">{{ health().uptime ? 'Reported by /health' : 'Reported as unknown by /health' }}</div>
             </div>
           </div>
         </div>
@@ -154,10 +154,70 @@ const REFRESH_MS = 30_000;
             <div class="ops-card-head"><div class="ops-card-title">API</div><span [class]="'ops-badge ' + health().state">{{ statusLabel() }}</span></div>
             <div class="ops-card-meta">GitRepoReco API · see the card above for details.</div>
           </div>
-          <div class="ops-card">
-            <div class="ops-card-head"><div class="ops-card-title">Database</div><span class="ops-badge">Waiting for API</span></div>
-            <div class="ops-card-meta">Needs the upcoming API status endpoint: status, uptime, DB size, response time, repositories and READMEs count.</div>
+        </div>
+        <div class="ops-card db-card">
+          <div class="ops-card-head">
+            <div>
+              <div class="ops-card-title">Database</div>
+              <div class="ops-card-meta">{{ dbVersion() }} · via /monitoring/*</div>
+            </div>
+            <span [class]="'ops-badge ' + db().state">{{ db().state === 'checking' ? 'Checking…' : db().state === 'up' ? 'Operational' : 'Down' }}</span>
           </div>
+          @if (db().state === 'down') {
+            <p class="ops-notice">The API did not return the database status (GET /monitoring/general failed).</p>
+          } @else if (db().state === 'up') {
+            <div class="ops-tiles">
+              @if (db().general; as g) {
+                <div class="ops-tile">
+                  <div class="label">Uptime</div>
+                  <div class="value">{{ g.uptime }}</div>
+                  <div class="hint">Since {{ g.start_time | date: 'dd/MM HH:mm' }}</div>
+                </div>
+                <div class="ops-tile">
+                  <div class="label">Connections</div>
+                  <div class="value">{{ g.active_connections }} / {{ g.max_connections }}</div>
+                  <div class="hint">{{ g.total_connections }} total</div>
+                </div>
+              }
+              <div class="ops-tile">
+                <div class="label">Response time</div>
+                <div class="value">{{ db().latencyMs }} ms</div>
+                <div class="hint">GET /monitoring/general</div>
+              </div>
+              @if (largestDb(); as l) {
+                <div class="ops-tile">
+                  <div class="label">Size</div>
+                  <div class="value">{{ l.size }}</div>
+                  <div class="hint">{{ l.database }}{{ dbCount() > 1 ? ' · ' + dbCount() + ' databases' : '' }}</div>
+                </div>
+              }
+              @if (db().cache; as c) {
+                <div class="ops-tile">
+                  <div class="label">Cache hit ratio</div>
+                  <div class="value">{{ c.cache_hit_ratio }} %</div>
+                  <div class="hint">Buffer cache, global</div>
+                </div>
+              }
+              @if (db().activeQueries !== null) {
+                <div class="ops-tile">
+                  <div class="label">Active queries</div>
+                  <div class="value">{{ db().activeQueries }}</div>
+                  <div class="hint">Running right now</div>
+                </div>
+              }
+              @if (db().schemas; as sc) {
+                <div class="ops-tile">
+                  <div class="label">Schemas</div>
+                  <div class="value">{{ sc.length }}</div>
+                  <div class="hint">{{ schemaList() }}</div>
+                </div>
+              }
+            </div>
+            @if (db().failed.length) { <p class="ops-card-meta">Unavailable: {{ db().failed.join(', ') }}</p> }
+          } @else {
+            <p class="ops-empty">Checking the database…</p>
+          }
+          <p class="ops-card-meta">Number of repositories and READMEs: not exposed by the API yet.</p>
         </div>
       </div>
     </section>`,
@@ -169,7 +229,15 @@ export class Dashboard {
   repo = PIPELINE_REPO;
 
   loading = signal(false);
-  health = signal<HealthCheck>({ state: 'checking', latencyMs: null, checkedAt: null, detail: null });
+  private dbLoading = false;
+  health = signal<HealthCheck>({ state: 'checking', latencyMs: null, checkedAt: null, detail: null, uptime: null });
+  db = signal<DatabaseStatus>({ state: 'checking', checkedAt: null, latencyMs: null, general: null, databases: null, schemas: null, cache: null, activeQueries: null, failed: [] });
+  // Version courte de PostgreSQL : "PostgreSQL 16.16 (Debian …)" -> "PostgreSQL 16.16"
+  dbVersion = computed(() => this.db().general?.version.match(/^PostgreSQL [\d.]+/)?.[0] ?? 'PostgreSQL');
+  dbCount = computed(() => this.db().databases?.length ?? 0);
+  // "github (4) · monitoring (1)" : nombre de tables par schéma
+  schemaList = computed(() => (this.db().schemas ?? []).map(x => `${x.schemaname} (${x.table_count})`).join(' · '));
+  largestDb = computed(() => [...(this.db().databases ?? [])].sort((a, b) => b.size_bytes - a.size_bytes)[0] ?? null);
   version = signal<VersionInfo>({ state: 'checking', value: null });
   pipeline = signal<PipelineState>({ state: 'checking', data: null, stale: false, message: null });
   successRate = computed(() => {
@@ -202,6 +270,10 @@ export class Dashboard {
   // force = clic sur Refresh : le service ne contourne le cache GitHub que s'il a plus de 30 s.
   refresh(force = false) {
     this.status.pipeline(force).subscribe(p => this.pipeline.set(p));
+    if (!this.dbLoading) {
+      this.dbLoading = true;
+      this.status.database().subscribe(d => { this.db.set(d); this.dbLoading = false; });
+    }
     if (this.loading()) return;
     this.loading.set(true);
     this.status.health().subscribe(h => { this.health.set(h); this.loading.set(false); });

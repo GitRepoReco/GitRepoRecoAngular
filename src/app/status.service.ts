@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, map, of, switchMap } from 'rxjs';
+import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import { API_BASE_URL, GITHUB_API, PIPELINE_REPO, PIPELINE_RUNS_LIMIT, PIPELINE_CACHE_MS, PIPELINE_MIN_REFRESH_MS } from './api.config';
-import { HealthCheck, PipelineData, PipelineJob, PipelineRun, PipelineState } from './models';
+import { DatabaseStatus, DbCache, DbGeneral, DbSchema, DbSize, HealthCheck, PipelineData, PipelineJob, PipelineRun, PipelineState } from './models';
 
 // Réponses (partielles) de l'API REST GitHub Actions
 interface GhRun {
@@ -29,12 +29,41 @@ export class StatusService {
     const t0 = performance.now();
     const elapsed = () => Math.round(performance.now() - t0);
     return this.http.get(`${API_BASE_URL}/health`, { observe: 'response', responseType: 'text' }).pipe(
-      map(res => ({ state: 'up' as const, latencyMs: elapsed(), checkedAt: new Date(), detail: this.detail(res.body) })),
+      map(res => ({ state: 'up' as const, latencyMs: elapsed(), checkedAt: new Date(), ...this.parseHealth(res.body) })),
       catchError(err => of<HealthCheck>({
         state: 'down', latencyMs: null, checkedAt: new Date(),
-        detail: err?.status ? `HTTP ${err.status}` : 'Unreachable',
+        detail: err?.status ? `HTTP ${err.status}` : 'Unreachable', uptime: null,
       })),
     );
+  }
+
+  // Base PostgreSQL via les endpoints /monitoring/* de l'API. Chaque endpoint est indépendant : un échec n'invalide pas les autres.
+  // La base est "up" si /monitoring/general répond ; son temps de réponse est celui de cet appel.
+  // (/monitoring/tables n'est pas utilisé : il renvoie 503 « permission denied for schema monitoring ».)
+  database(): Observable<DatabaseStatus> {
+    const failed: string[] = [];
+    const get = <T>(path: string): Observable<T | null> =>
+      this.http.get<T>(`${API_BASE_URL}/monitoring/${path}`).pipe(
+        catchError(err => { console.error(`API /monitoring/${path} :`, err); failed.push(path); return of(null); }));
+    const t0 = performance.now();
+    const general$ = get<DbGeneral>('general').pipe(map(g => ({ g, ms: Math.round(performance.now() - t0) })));
+    return forkJoin({
+      general: general$,
+      databases: get<{ items: DbSize[] }>('databases'),
+      schemas: get<{ items: DbSchema[] }>('schemas'),
+      cache: get<DbCache>('cache'),
+      queries: get<{ count: number }>('active-queries'),
+    }).pipe(map(r => ({
+      state: r.general.g ? 'up' as const : 'down' as const,
+      checkedAt: new Date(),
+      latencyMs: r.general.g ? r.general.ms : null,
+      general: r.general.g,
+      databases: r.databases?.items ?? null,
+      schemas: r.schemas?.items ?? null,
+      cache: r.cache,
+      activeQueries: r.queries?.count ?? null,
+      failed,
+    })));
   }
 
   // GET /version : { "version": "v1.3" }
@@ -106,16 +135,17 @@ export class StatusService {
     try { localStorage.setItem(PIPELINE_CACHE_KEY, JSON.stringify(data)); } catch { /* quota / mode privé */ }
   }
 
-  private detail(body: string | null): string | null {
+  // Corps de /health : { "status": "ok", "uptime": "unknown" } ; tolère un texte court ou un JSON différent.
+  private parseHealth(body: string | null): { detail: string | null; uptime: string | null } {
     const text = (body ?? '').trim();
-    if (!text) return null;
+    if (!text) return { detail: null, uptime: null };
     try {
       const json = JSON.parse(text);
-      if (typeof json === 'string') return json;
-      if (json && typeof json.status === 'string') return json.status;
-      return null;
+      if (typeof json === 'string') return { detail: json, uptime: null };
+      const uptime = typeof json?.uptime === 'string' && json.uptime.toLowerCase() !== 'unknown' ? json.uptime : null;
+      return { detail: typeof json?.status === 'string' ? json.status : null, uptime };
     } catch {
-      return text.length <= 60 ? text : null;
+      return { detail: text.length <= 60 ? text : null, uptime: null };
     }
   }
 }
