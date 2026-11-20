@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
-import { API_BASE_URL, GITHUB_API, PIPELINE_REPO, PIPELINE_RUNS_LIMIT, PIPELINE_CACHE_MS, PIPELINE_MIN_REFRESH_MS } from './api.config';
-import { DatabaseStatus, DbCache, DbGeneral, DbSchema, DbSize, HealthCheck, PipelineData, PipelineJob, PipelineRun, PipelineState } from './models';
+import { API_BASE_URL, GITHUB_API, PIPELINE_RUNS_LIMIT, PIPELINE_CACHE_MS, PIPELINE_MIN_REFRESH_MS } from './api.config';
+import { CollectorStatus, DatabaseStatus, DbCache, DbGeneral, DbSchema, DbSize, DbTable, HealthCheck, PipelineData, PipelineJob, PipelineRun, PipelineState, RateLimit } from './models';
 
 // Réponses (partielles) de l'API REST GitHub Actions
 interface GhRun {
@@ -12,7 +12,7 @@ interface GhRun {
 }
 interface GhJob { name: string; status: string; conclusion: string | null; started_at: string | null; completed_at: string | null; html_url: string }
 
-const PIPELINE_CACHE_KEY = 'pipeline_runs_v1';
+const PIPELINE_CACHE_KEY = 'pipeline_runs_v2'; // suffixé par le repo : pipeline_runs_v2:owner/repo
 const seconds = (from: string | null | undefined, to: string | null | undefined): number | null =>
   from && to ? Math.max(0, Math.round((Date.parse(to) - Date.parse(from)) / 1000)) : null;
 
@@ -20,8 +20,8 @@ const seconds = (from: string | null | undefined, to: string | null | undefined)
 @Injectable({ providedIn: 'root' })
 export class StatusService {
   private http = inject(HttpClient);
-  // Après un échec GitHub (rate limit, réseau), on ne réessaie pas avant PIPELINE_CACHE_MS, même via l'auto-refresh de 30 s.
-  private pipelineFailure: { at: number; message: string } | null = null;
+  // Après un échec GitHub (rate limit, réseau), on ne réessaie pas avant PIPELINE_CACHE_MS, même via l'auto-refresh de 30 s (un échec par repo).
+  private pipelineFailures = new Map<string, { at: number; message: string }>();
 
   // GET /health : l'API est "up" si elle répond en 2xx. Le corps est lu en texte puis interprété
   // au mieux (JSON { status } ou texte court) pour ne pas dépendre de son format exact.
@@ -39,7 +39,7 @@ export class StatusService {
 
   // Base PostgreSQL via les endpoints /monitoring/* de l'API. Chaque endpoint est indépendant : un échec n'invalide pas les autres.
   // La base est "up" si /monitoring/general répond ; son temps de réponse est celui de cet appel.
-  // (/monitoring/tables n'est pas utilisé : il renvoie 503 « permission denied for schema monitoring ».)
+  // /monitoring/tables donne les statistiques par table (estimated_rows : estimation PostgreSQL, pas un COUNT exact).
   database(): Observable<DatabaseStatus> {
     const failed: string[] = [];
     const get = <T>(path: string): Observable<T | null> =>
@@ -51,6 +51,7 @@ export class StatusService {
       general: general$,
       databases: get<{ items: DbSize[] }>('databases'),
       schemas: get<{ items: DbSchema[] }>('schemas'),
+      tables: get<{ items: DbTable[] }>('tables'),
       cache: get<DbCache>('cache'),
       queries: get<{ count: number }>('active-queries'),
     }).pipe(map(r => ({
@@ -60,10 +61,28 @@ export class StatusService {
       general: r.general.g,
       databases: r.databases?.items ?? null,
       schemas: r.schemas?.items ?? null,
+      tables: r.tables?.items ?? null,
       cache: r.cache,
       activeQueries: r.queries?.count ?? null,
       failed,
     })));
+  }
+
+  // Collecteur : GET /monitoring/rate-limit/latest renvoie le dernier relevé du quota de l'API GitHub.
+  // Le collecteur est considéré "up" si l'API renvoie ce relevé (2xx), "down" sinon.
+  collector(): Observable<CollectorStatus> {
+    const empty = { remaining: null, limit: null, resetAt: null, operation: null, recordedAt: null };
+    return this.http.get<RateLimit>(`${API_BASE_URL}/monitoring/rate-limit/latest`).pipe(
+      map((r): CollectorStatus => ({
+        state: 'up', checkedAt: new Date(),
+        remaining: r.remaining, limit: r.limit_value, resetAt: this.parseUtc(r.reset_at),
+        operation: r.operation_name, recordedAt: this.parseUtc(r.timestamp),
+      })),
+      catchError(err => {
+        console.error('API /monitoring/rate-limit/latest :', err);
+        return of<CollectorStatus>({ state: 'down', checkedAt: new Date(), ...empty });
+      }),
+    );
   }
 
   // GET /version : { "version": "v1.3" }
@@ -71,17 +90,17 @@ export class StatusService {
     return this.http.get<{ version: string }>(`${API_BASE_URL}/version`).pipe(map(res => res.version));
   }
 
-  // GitHub Actions : derniers runs du repo + jobs du dernier run (2 requêtes). Sans token (repo public, 60 req/h/IP) :
+  // GitHub Actions : derniers runs d'un repo + jobs du dernier run (2 requêtes). Sans token (repo public, 60 req/h/IP) :
   // résultat mis en cache dans localStorage pendant PIPELINE_CACHE_MS ; en cas d'erreur (rate limit, réseau), on retombe sur le dernier cache.
-  pipeline(force = false): Observable<PipelineState> {
-    const cached = this.readPipelineCache();
+  pipeline(repo: string, force = false): Observable<PipelineState> {
+    const cached = this.readPipelineCache(repo);
     const age = cached ? Date.now() - cached.fetchedAt : Infinity;
     if (cached && age < (force ? PIPELINE_MIN_REFRESH_MS : PIPELINE_CACHE_MS)) return of(this.ok(cached, false, null));
 
-    const fail = this.pipelineFailure;
+    const fail = this.pipelineFailures.get(repo);
     if (fail && Date.now() - fail.at < PIPELINE_CACHE_MS && !force) return of(this.failed(cached, fail.message));
 
-    const base = `${GITHUB_API}/repos/${PIPELINE_REPO}/actions`;
+    const base = `${GITHUB_API}/repos/${repo}/actions`;
     return this.http.get<{ workflow_runs: GhRun[] }>(`${base}/runs`, { params: { per_page: PIPELINE_RUNS_LIMIT } }).pipe(
       switchMap(res => {
         const runs = (res.workflow_runs ?? []).map((r): PipelineRun => ({
@@ -96,15 +115,15 @@ export class StatusService {
             name: x.name, status: x.status, conclusion: x.conclusion, url: x.html_url,
             durationSec: x.status === 'completed' ? seconds(x.started_at, x.completed_at) : null,
           }))),
-          catchError(err => { console.error('GitHub jobs :', err); return of([] as PipelineJob[]); }),
+          catchError(err => { console.error(`GitHub jobs (${repo}) :`, err); return of([] as PipelineJob[]); }),
           map((jobs): PipelineData => ({ runs, jobs, fetchedAt: Date.now() })),
         );
       }),
-      map(data => { this.pipelineFailure = null; this.writePipelineCache(data); return this.ok(data, false, null); }),
+      map(data => { this.pipelineFailures.delete(repo); this.writePipelineCache(repo, data); return this.ok(data, false, null); }),
       catchError(err => {
-        console.error('GitHub Actions :', err);
+        console.error(`GitHub Actions (${repo}) :`, err);
         const message = this.githubError(err);
-        this.pipelineFailure = { at: Date.now(), message };
+        this.pipelineFailures.set(repo, { at: Date.now(), message });
         return of(this.failed(cached, message));
       }),
     );
@@ -122,17 +141,25 @@ export class StatusService {
       const at = reset ? ` Resets at ${new Date(reset * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}.` : '';
       return `GitHub rate limit reached (60 requests/hour without a token).${at}`;
     }
+    if (err?.status === 404) return 'Repository or workflows not found (HTTP 404): the repo may be private.';
     return err?.status ? `GitHub API error (HTTP ${err.status}).` : 'GitHub API unreachable.';
   }
 
-  private readPipelineCache(): PipelineData | null {
+  // Les horodatages du collecteur sont en UTC mais sans suffixe : sans "Z", new Date() les lirait en heure locale (décalage d'1-2 h en France).
+  private parseUtc(value: string | null | undefined): Date | null {
+    if (!value) return null;
+    const d = new Date(/(Z|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  private readPipelineCache(repo: string): PipelineData | null {
     try {
-      const raw = localStorage.getItem(PIPELINE_CACHE_KEY);
+      const raw = localStorage.getItem(`${PIPELINE_CACHE_KEY}:${repo}`);
       return raw ? (JSON.parse(raw) as PipelineData) : null;
     } catch { return null; }
   }
-  private writePipelineCache(data: PipelineData) {
-    try { localStorage.setItem(PIPELINE_CACHE_KEY, JSON.stringify(data)); } catch { /* quota / mode privé */ }
+  private writePipelineCache(repo: string, data: PipelineData) {
+    try { localStorage.setItem(`${PIPELINE_CACHE_KEY}:${repo}`, JSON.stringify(data)); } catch { /* quota / mode privé */ }
   }
 
   // Corps de /health : { "status": "ok", "uptime": "unknown" } ; tolère un texte court ou un JSON différent.

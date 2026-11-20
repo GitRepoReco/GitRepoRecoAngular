@@ -17,10 +17,17 @@ export const TEAM_EXCLUDE_FORKS = true;
 export const TEAM_LIMIT = 30;
 export const TEAM_CACHE_MS = 30 * 60 * 1000;
 
-// --- Page Dashboard : pipeline CI/CD (GitHub Actions) ---
-// Repo dont on suit les runs (API REST publique : aucun token requis, limite de 60 requêtes/h/IP).
-export const PIPELINE_REPO = 'GitRepoReco/GitRepoRecoAngular';
+// --- Page Dashboard : pipelines CI/CD (GitHub Actions) ---
+// Repos dont on suit les runs (API REST publique : aucun token requis, limite de 60 requêtes/h/IP).
+// Chaque repo coûte 2 requêtes par rafraîchissement (runs + jobs du dernier run).
+export const PIPELINES = [
+  { repo: 'GitRepoReco/GitRepoRecoAngular', label: 'Frontend' },
+  { repo: 'GitRepoReco/GitRepoSetup', label: 'Setup' },
+  { repo: 'GitRepoReco/GitRepoAPI', label: 'API' },
+  { repo: 'GitRepoReco/GitRepoCollector', label: 'Collector' },
+];
 export const PIPELINE_RUNS_LIMIT = 10;
 // Durée de validité du cache (localStorage, partagé entre onglets) ; le bouton Refresh ne contourne le cache qu'au-delà de PIPELINE_MIN_REFRESH_MS.
-export const PIPELINE_CACHE_MS = 5 * 60 * 1000;
-export const PIPELINE_MIN_REFRESH_MS = 30 * 1000;
+// 4 repos x 2 requêtes toutes les 15 min = 32 requêtes/h, sous la limite de 60.
+export const PIPELINE_CACHE_MS = 15 * 60 * 1000;
+export const PIPELINE_MIN_REFRESH_MS = 60 * 1000;

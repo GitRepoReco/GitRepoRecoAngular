@@ -18,7 +18,18 @@ h2{margin:0 0 .25rem}
 .ops-section h2{font-size:1.2rem;margin-bottom:.8rem}
 .ops-sub-title{margin:1.4rem 0 .7rem;font-size:.95rem;font-weight:600;color:var(--muted)}
 .ops-card a,.ops-table a{color:var(--accent)}
-.db-card{margin-top:1rem;>p{margin:.8rem 0 0}}
+.ops-stack{display:grid;gap:1rem}
+.ops-card>p:not(.ops-notice):not(.ops-empty){margin:.8rem 0 0}
+.ops-tile .value small{font-size:.8rem;font-weight:400;color:var(--muted)}
+.ops-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  >summary{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;cursor:pointer;padding:1rem 1.4rem;font-weight:600;list-style:none;
+    &::-webkit-details-marker{display:none}
+    &::before{content:'▸';color:var(--muted);margin-right:.6rem;transition:transform .15s}}
+  >summary .ops-panel-title{flex:1;min-width:0;small{margin-left:.5rem;font-weight:400;color:var(--muted);font-size:.8rem}}
+  &[open]>summary::before{transform:rotate(90deg)}
+  &[open]>summary{border-bottom:1px solid var(--border)}}
+.ops-panel-body{padding:1.2rem 1.4rem;display:grid;gap:.4rem}
+.ops-panel-body .ops-sub-title:first-child{margin-top:0}
 .ops-btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:.55rem 1.1rem;font-weight:600;
   &:disabled{opacity:.5;cursor:not-allowed}
   &.ghost{background:none;color:var(--text);border:1px solid var(--border)}}

@@ -19,7 +19,7 @@ The application is inspired by Netflix's interface: scrollable rows of recommend
 - **Twin repositories**: free-text search (README, title, topics...) to find equivalent repositories, with a similarity score and a badge for abandoned projects.
 - **Buzzfeed-style quiz**: a few questions, a developer profile, then recommended repositories.
 - **Monitoring** tab (skeleton): deployed ML models, versions, environments, data drift and retraining actions. Not connected yet.
-- **Dashboard** tab: DevOps view. The *GitRepoReco API* card is live (healthcheck, version, response time, refreshed every 30 s). The *Pipeline* section shows the GitHub Actions runs of the repo (`PIPELINE_REPO` in `api.config.ts`, no token needed, cached 5 min in `localStorage` because of the 60 requests/hour limit). *Components*: Frontend and API status, plus the PostgreSQL database (uptime, connections, size, cache hit ratio, active queries, schemas) read from the API's `/monitoring/*` endpoints.
+- **Dashboard** tab: DevOps view, refreshed every 30 s. *Components* come first: Frontend, the *GitRepoReco API* (healthcheck, version, response time, uptime), the PostgreSQL database (uptime, connections, size, number of repositories and READMEs, cache hit ratio, active queries, schemas, read from the API's `/monitoring/*` endpoints) and the *Collector* (healthcheck, remaining GitHub API tokens, quota reset time and last operation, read from `GET /monitoring/rate-limit/latest`). *Pipelines* come next: one collapsible block per repository listed in `PIPELINES` in `api.config.ts` (Angular, Setup, API, Collector), each showing the last GitHub Actions run, its stages and the recent runs. No token needed: results are cached 15 min per repository in `localStorage` because of the 60 requests/hour limit (2 requests per repository).
 
 ---
 
@@ -77,9 +77,10 @@ src/
     ├── repo-card.ts             — repository card
     ├── repo-row.ts              — horizontally scrollable row
     ├── app.routes.ts            — routes (/, /monitoring, /dashboard)
-    ├── dashboard.ts             — Dashboard tab (DevOps)
+    ├── dashboard.ts             — Dashboard tab (DevOps): components, then pipelines
+    ├── pipeline-panel.ts        — GitHub Actions pipeline of one repository
     ├── monitoring.ts            — Monitoring tab (MLOps)
-    ├── status.service.ts        — API healthcheck / version
+    ├── status.service.ts        — API healthcheck / version, database, collector, GitHub Actions
     ├── twin-search.ts           — twin repositories search
     └── quiz.ts                  — recommendation quiz
 ```

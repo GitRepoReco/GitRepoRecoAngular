@@ -21,7 +21,7 @@ export interface HealthCheck { state: CheckState; latencyMs: number | null; chec
 // Résultat d'un appel GET /version
 export interface VersionInfo { state: 'checking' | 'ok' | 'error'; value: string | null }
 
-// Pipeline CI/CD : runs GitHub Actions (GET /repos/{repo}/actions/runs) et jobs du dernier run
+// Pipelines CI/CD : runs GitHub Actions (GET /repos/{repo}/actions/runs) et jobs du dernier run, un état par repo
 export interface PipelineRun {
   id: number; name: string; title: string; status: string; conclusion: string | null;
   event: string; branch: string; sha: string; url: string; actor: string | null;
@@ -35,10 +35,21 @@ export interface PipelineState { state: 'checking' | 'ok' | 'error'; data: Pipel
 export interface DbGeneral { version: string; start_time: string; uptime: string; max_connections: number; active_connections: number; total_connections: number }
 export interface DbSize { database: string; size_bytes: number; size: string }
 export interface DbSchema { schemaname: string; table_count: number }
+export interface DbTable { schemaname: string; table_name: string; estimated_rows: number; total_size_bytes: number }
 export interface DbCache { cache_hits: number; disk_reads: number; cache_hit_ratio: number }
 export interface DatabaseStatus {
   state: CheckState; checkedAt: Date | null; latencyMs: number | null;
-  general: DbGeneral | null; databases: DbSize[] | null; schemas: DbSchema[] | null; cache: DbCache | null;
+  general: DbGeneral | null; databases: DbSize[] | null; schemas: DbSchema[] | null; tables: DbTable[] | null; cache: DbCache | null;
   activeQueries: number | null;
   failed: string[]; // endpoints /monitoring/* qui n'ont pas répondu
+}
+
+// Collecteur : GET /monitoring/rate-limit/latest (dernier relevé du quota de l'API GitHub, horodatages en UTC sans suffixe "Z")
+export interface RateLimit {
+  id: number; timestamp: string; limit_value: number; remaining: number; used: number; cost: number;
+  reset_at: string; operation_name: string;
+}
+export interface CollectorStatus {
+  state: CheckState; checkedAt: Date | null;
+  remaining: number | null; limit: number | null; resetAt: Date | null; operation: string | null; recordedAt: Date | null;
 }
