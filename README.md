@@ -1,6 +1,6 @@
-# RepoReco Web
+# GitRepoReco Angular
 
-Web interface of **RepoReco**, a GitHub repository recommender system developed as part of the Big Data and MLOps courses of the Master's in AI (M2) at Le Mans University.
+Web interface of **GitRepoReco**, a GitHub repository recommender system developed as part of the Big Data and MLOps courses of the Master's in AI (M2) at Le Mans University.
 
 The application is inspired by Netflix's interface: scrollable rows of recommended repositories, a search for "twin" repositories, and a quiz to discover repositories in a playful way. It presents the results of the different recommendation algorithms built in the project.
 
