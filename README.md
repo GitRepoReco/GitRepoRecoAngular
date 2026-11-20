@@ -120,4 +120,7 @@ The `Repository` interface (`src/app/models.ts`) mirrors the columns of the `git
 
 - **Main Repository:** [Repo Recommender](https://github.com/GitRepoReco/Analyse-github)
 - **Angular Repository:** [Repo Recommender - angular project](https://github.com/GitRepoReco/GitRepoRecoAngular)
+- **Encoder:** [Repo Recommender - encoder](https://github.com/GitRepoReco/GitRepoRecoEncoder)
+- **Setup:** [Repo Recommender - DB setup](https://github.com/GitRepoReco/GitRepoSetup)
+- **Collector:** [Repo Recommender - collector](https://github.com/GitRepoReco/GitRepoCollector)
 - **.github:** [.github](https://github.com/GitRepoReco/.github)
